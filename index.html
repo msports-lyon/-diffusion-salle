@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Régie Vidéo — Diffusion Salle</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600&family=Space+Mono:wght@400;700&display=swap');
+
+    :root {
+      --bg:        #0d0f12;
+      --surface:   #161920;
+      --border:    #252932;
+      --accent:    #00e5b0;
+      --muted:     #4a5260;
+      --text:      #d8dde8;
+      --text-dim:  #7a8494;
+      --mono: 'Space Mono', monospace;
+      --sans: 'Space Grotesk', sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: var(--sans); min-height: 100vh; display: flex; flex-direction: column; }
+
+    header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 18px 32px; border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; background: var(--bg); z-index: 10;
+    }
+    .logo { font-family: var(--mono); font-size: 13px; letter-spacing: .15em; color: var(--accent); text-transform: uppercase; }
+    .logo span { color: var(--text-dim); }
+    .status-bar { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-dim); font-family: var(--mono); }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); transition: background .3s; }
+    .dot.live { background: var(--accent); box-shadow: 0 0 8px var(--accent); animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{box-shadow:0 0 8px var(--accent)} 50%{box-shadow:0 0 18px var(--accent)} }
+
+    nav { display: flex; gap: 4px; }
+    nav button { background: none; border: 1px solid transparent; color: var(--text-dim); padding: 6px 16px; border-radius: 6px; font-family: var(--sans); font-size: 13px; cursor: pointer; transition: all .2s; }
+    nav button.active, nav button:hover { background: var(--surface); border-color: var(--border); color: var(--text); }
+    nav button.active { color: var(--accent); }
+
+    main { flex: 1; padding: 40px 32px; max-width: 960px; margin: 0 auto; width: 100%; }
+    .page { display: none; }
+    .page.active { display: block; }
+
+    .section-label { font-family: var(--mono); font-size: 10px; letter-spacing: .2em; color: var(--accent); text-transform: uppercase; margin-bottom: 20px; }
+    h1 { font-size: 28px; font-weight: 600; margin-bottom: 6px; }
+    .sub { color: var(--text-dim); font-size: 14px; margin-bottom: 36px; }
+
+    /* Upload */
+    .upload-zone {
+      border: 2px dashed var(--border); border-radius: 16px; padding: 60px 40px;
+      text-align: center; cursor: pointer; transition: all .25s;
+      position: relative; background: var(--surface);
+    }
+    .upload-zone:hover, .upload-zone.drag { border-color: var(--accent); background: #0d1f1a; }
+    .upload-zone input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+    .upload-icon { font-size: 48px; margin-bottom: 16px; display: block; transition: filter .3s; }
+    .upload-zone h3 { font-size: 18px; margin-bottom: 8px; }
+    .upload-zone p { font-size: 13px; color: var(--text-dim); }
+    .formats { margin-top: 20px; display: inline-flex; gap: 8px; }
+    .tag { font-family: var(--mono); font-size: 10px; padding: 3px 9px; border-radius: 4px; border: 1px solid var(--border); color: var(--muted); letter-spacing: .1em; }
+
+    /* Progress */
+    .progress-wrap { margin-top: 28px; display: none; }
+    .progress-wrap.show { display: block; }
+    .progress-info { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-dim); font-family: var(--mono); margin-bottom: 8px; }
+    .progress-bar { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+    .progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent), #00a87f); width: 0%; transition: width .1s; border-radius: 3px; }
+
+    /* Alert box */
+    .alert {
+      margin-top: 20px; padding: 14px 20px; border-radius: 12px;
+      font-size: 13px; display: none;
+      border: 1px solid;
+    }
+    .alert.show { display: block; }
+    .alert.success { background: #0a1f18; border-color: var(--accent); color: var(--accent); }
+    .alert.error { background: #1f0a0a; border-color: #ff4d6a; color: #ff4d6a; }
+    .alert.info { background: var(--surface); border-color: var(--border); color: var(--text-dim); }
+
+    /* URL box */
+    .url-box {
+      margin-top: 28px; background: var(--surface);
+      border: 1px solid var(--border); border-radius: 14px;
+      padding: 20px 24px; display: none;
+    }
+    .url-box.show { display: block; }
+    .url-box h3 { font-size: 14px; color: var(--text-dim); margin-bottom: 14px; font-weight: 400; }
+    .url-line {
+      display: flex; align-items: center; gap: 10px;
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 8px; padding: 10px 14px; margin-bottom: 10px;
+    }
+    .url-line code { font-family: var(--mono); font-size: 13px; color: var(--accent); flex: 1; word-break: break-all; }
+    .copy-btn { background: var(--border); border: none; color: var(--text); padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; font-family: var(--mono); flex-shrink: 0; transition: background .2s; }
+    .copy-btn:hover { background: var(--accent); color: #000; }
+
+    /* Screens grid */
+    .screens-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 36px; }
+    .screen-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+    .screen-top {
+      background: #000; aspect-ratio: 16/9;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 36px; color: var(--muted); position: relative;
+    }
+    .screen-top .tv-label {
+      position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
+      font-family: var(--mono); font-size: 10px; color: var(--muted); letter-spacing: .1em;
+    }
+    .screen-top.ready .tv-label { color: var(--accent); }
+    .screen-top.ready::after {
+      content: ''; position: absolute; top: 10px; right: 10px;
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--accent); box-shadow: 0 0 6px var(--accent);
+    }
+    .screen-body { padding: 14px 16px; }
+    .screen-body h4 { font-size: 14px; margin-bottom: 4px; }
+    .screen-body p { font-size: 12px; color: var(--text-dim); margin-bottom: 12px; }
+
+    .btn { display: inline-flex; align-items: center; gap: 6px; font-family: var(--sans); font-size: 13px; font-weight: 500; padding: 8px 16px; border-radius: 8px; border: none; cursor: pointer; transition: all .2s; text-decoration: none; }
+    .btn-primary { background: var(--accent); color: #000; }
+    .btn-primary:hover { background: #00ffca; }
+    .btn-ghost { background: transparent; color: var(--text-dim); border: 1px solid var(--border); }
+    .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+    .btn-full { width: 100%; justify-content: center; }
+    .btn:disabled { opacity: .4; cursor: not-allowed; }
+
+    /* Instructions */
+    .instruction-box { margin-top: 36px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 24px 28px; }
+    .instruction-box h3 { font-size: 15px; margin-bottom: 16px; }
+    .steps { display: flex; flex-direction: column; gap: 14px; }
+    .step { display: flex; align-items: flex-start; gap: 14px; font-size: 13px; color: var(--text-dim); }
+    .step-num { width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-family: var(--mono); font-size: 11px; color: var(--accent); flex-shrink: 0; }
+    .step code { font-family: var(--mono); font-size: 12px; background: var(--bg); padding: 1px 6px; border-radius: 4px; color: var(--accent); }
+    .step strong { color: var(--text); }
+
+    /* Player page */
+    .player-full {
+      background: #000; width: 100%; height: calc(100vh - 65px);
+      display: flex; align-items: center; justify-content: center;
+    }
+    video#mainPlayer { width: 100%; height: 100%; object-fit: contain; display: none; }
+    .no-video-msg { text-align: center; color: var(--muted); }
+    .no-video-msg .icon { font-size: 56px; margin-bottom: 16px; }
+    .no-video-msg p { font-size: 13px; font-family: var(--mono); margin-bottom: 4px; }
+
+    /* Toast */
+    #toast { position: fixed; bottom: 32px; right: 32px; background: var(--surface); border: 1px solid var(--accent); color: var(--text); padding: 12px 20px; border-radius: 10px; font-size: 13px; font-family: var(--mono); opacity: 0; transform: translateY(10px); transition: all .3s; pointer-events: none; z-index: 999; }
+    #toast.show { opacity: 1; transform: translateY(0); }
+
+    @media (max-width: 640px) {
+      main { padding: 24px 16px; } header { padding: 14px 16px; }
+      .screens-grid { grid-template-columns: 1fr; } h1 { font-size: 22px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">⬡ <span>régie</span>·diffusion</div>
+  <div class="status-bar">
+    <div class="dot" id="statusDot"></div>
+    <span id="statusText">En attente</span>
+  </div>
+  <nav>
+    <button class="active" onclick="showPage('admin')" id="btn-admin">Admin</button>
+    <button onclick="showPage('player')" id="btn-player">Lecteur TV</button>
+  </nav>
+</header>
+
+<main>
+
+  <!-- ══ PAGE ADMIN ══ -->
+  <div class="page active" id="page-admin">
+    <div class="section-label">// Console de diffusion</div>
+    <h1>Chargez votre vidéo</h1>
+    <p class="sub">La vidéo sera diffusée depuis ce PC sur les 3 télés via le réseau Wi-Fi local.</p>
+
+    <div class="upload-zone" id="uploadZone">
+      <input type="file" id="fileInput" accept="video/*" />
+      <span class="upload-icon">🎬</span>
+      <h3>Glissez votre vidéo ici</h3>
+      <p>ou cliquez pour parcourir — MP4 recommandé</p>
+      <div class="formats">
+        <span class="tag">MP4</span><span class="tag">MOV</span><span class="tag">WEBM</span><span class="tag">MKV</span>
+      </div>
+    </div>
+
+    <div class="progress-wrap" id="progressWrap">
+      <div class="progress-info">
+        <span id="progressName">—</span>
+        <span id="progressPct">0%</span>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+    </div>
+
+    <div class="alert" id="alertBox"></div>
+
+    <!-- URL de diffusion -->
+    <div class="url-box" id="urlBox">
+      <h3>🌐 Ouvrez cette URL sur chaque télé :</h3>
+      <div class="url-line">
+        <code id="playerUrl">—</code>
+        <button class="copy-btn" onclick="copyUrl()">Copier</button>
+      </div>
+      <p style="font-size:12px;color:var(--text-dim);margin-top:4px;">Toutes les télés doivent être sur le même réseau Wi-Fi que ce PC.</p>
+    </div>
+
+    <!-- Télés -->
+    <div id="screensSection" style="display:none;">
+      <div style="margin-top:40px" class="section-label">// Statut des télés</div>
+      <div class="screens-grid">
+        <div class="screen-card">
+          <div class="screen-top ready" id="screen1"><span>📺</span><span class="tv-label">TÉLÉ 1</span></div>
+          <div class="screen-body">
+            <h4>Télé 1</h4>
+            <p>Ouvrez l'URL ci-dessus dans le navigateur de cette télé.</p>
+            <button class="btn btn-ghost btn-full" onclick="copyUrl()">📋 Copier l'URL</button>
+          </div>
+        </div>
+        <div class="screen-card">
+          <div class="screen-top ready" id="screen2"><span>📺</span><span class="tv-label">TÉLÉ 2</span></div>
+          <div class="screen-body">
+            <h4>Télé 2</h4>
+            <p>Ouvrez l'URL ci-dessus dans le navigateur de cette télé.</p>
+            <button class="btn btn-ghost btn-full" onclick="copyUrl()">📋 Copier l'URL</button>
+          </div>
+        </div>
+        <div class="screen-card">
+          <div class="screen-top ready" id="screen3"><span>📺</span><span class="tv-label">TÉLÉ 3</span></div>
+          <div class="screen-body">
+            <h4>Télé 3</h4>
+            <p>Ouvrez l'URL ci-dessus dans le navigateur de cette télé.</p>
+            <button class="btn btn-ghost btn-full" onclick="copyUrl()">📋 Copier l'URL</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Instructions -->
+    <div class="instruction-box" style="margin-top:36px;">
+      <h3>📋 Mode d'emploi complet</h3>
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-text">Sur votre PC, lancez le serveur local : double-cliquez sur <strong>LANCER-SERVEUR.bat</strong> (Windows) ou exécutez <code>python server.py</code> dans le terminal.</div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-text">Ouvrez <code>http://localhost:8080</code> dans votre navigateur. Déposez votre vidéo dans la zone ci-dessus.</div>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-text">Une URL locale s'affiche (ex: <code>http://192.168.1.XX:8080/tv</code>). <strong>Ouvrez-la sur chaque télé</strong> via leur navigateur intégré.</div>
+        </div>
+        <div class="step">
+          <div class="step-num">4</div>
+          <div class="step-text">La vidéo se lit <strong>en boucle automatique</strong>, en plein écran, sans interface. Gardez votre PC allumé pendant la diffusion.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ PAGE LECTEUR TV ══ -->
+  <div class="page" id="page-player" style="padding:0;max-width:100%;margin:0;">
+    <div class="player-full" id="playerWrap">
+      <div class="no-video-msg" id="noVideoMsg">
+        <div class="icon">📺</div>
+        <p>Connexion au serveur...</p>
+        <p id="noVideoSub" style="font-size:12px;margin-top:4px;"></p>
+      </div>
+      <video id="mainPlayer" autoplay muted loop playsinline></video>
+    </div>
+  </div>
+
+</main>
+
+<div id="toast"></div>
+
+<script>
+  // Detect if we're on the /tv route
+  const isTV = window.location.pathname.endsWith('/tv') || window.location.hash === '#tv';
+
+  if (isTV) {
+    document.querySelectorAll('header, main > *').forEach(el => el.style.display = 'none');
+    document.body.style.overflow = 'hidden';
+    loadTVPlayer();
+  } else if (window.location.hash === '#player') {
+    showPage('player');
+  }
+
+  // ── NAV ──
+  function showPage(name) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+    document.getElementById('page-' + name).classList.add('active');
+    document.getElementById('btn-' + name).classList.add('active');
+    if (name === 'player') loadTVPlayer();
+  }
+
+  // ── UPLOAD ──
+  const uploadZone = document.getElementById('uploadZone');
+  const fileInput  = document.getElementById('fileInput');
+  let currentFilename = '';
+
+  uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('drag'); });
+  uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag'));
+  uploadZone.addEventListener('drop', e => {
+    e.preventDefault(); uploadZone.classList.remove('drag');
+    const f = e.dataTransfer.files[0];
+    if (f && f.type.startsWith('video/')) handleFile(f);
+    else toast('❌ Fichier non supporté');
+  });
+  fileInput.addEventListener('change', () => { if (fileInput.files[0]) handleFile(fileInput.files[0]); });
+
+  function handleFile(file) {
+    currentFilename = file.name;
+    const wrap  = document.getElementById('progressWrap');
+    const fill  = document.getElementById('progressFill');
+    const pct   = document.getElementById('progressPct');
+    const pname = document.getElementById('progressName');
+    wrap.classList.add('show');
+    pname.textContent = file.name;
+
+    showAlert('info', '📤 Envoi au serveur local en cours...');
+
+    const formData = new FormData();
+    formData.append('video', file);
+
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/upload');
+
+    xhr.upload.onprogress = e => {
+      if (e.lengthComputable) {
+        const p = Math.round((e.loaded / e.total) * 100);
+        fill.style.width = p + '%';
+        pct.textContent = p + '%';
+      }
+    };
+
+    xhr.onload = () => {
+      if (xhr.status === 200) {
+        afterUpload();
+      } else {
+        showAlert('error', '❌ Erreur serveur. Assurez-vous que server.py est lancé.');
+      }
+    };
+
+    xhr.onerror = () => {
+      // Fallback: serveur non lancé, simuler pour demo locale
+      let p = 0;
+      const iv = setInterval(() => {
+        p += Math.random() * 15;
+        if (p >= 100) { p = 100; clearInterval(iv); afterUploadFallback(); }
+        fill.style.width = p + '%';
+        pct.textContent = Math.round(p) + '%';
+      }, 80);
+    };
+
+    xhr.send(formData);
+  }
+
+  function afterUpload() {
+    document.getElementById('progressFill').style.width = '100%';
+    document.getElementById('progressPct').textContent = '100%';
+    showAlert('success', '✅ Vidéo prête ! Les télés peuvent maintenant la lire.');
+    showPlayerUrl();
+    document.getElementById('statusDot').classList.add('live');
+    document.getElementById('statusText').textContent = currentFilename;
+    document.getElementById('screensSection').style.display = 'block';
+    toast('✅ Vidéo en ligne — ' + currentFilename);
+  }
+
+  function afterUploadFallback() {
+    showAlert('error', '⚠️ Serveur non détecté. Lancez LANCER-SERVEUR.bat puis rechargez la page.');
+  }
+
+  function showPlayerUrl() {
+    const host = window.location.hostname || 'localhost';
+    const port = window.location.port || '8080';
+    const url  = `http://${host}:${port}/tv`;
+    document.getElementById('playerUrl').textContent = url;
+    document.getElementById('urlBox').classList.add('show');
+  }
+
+  function copyUrl() {
+    const url = document.getElementById('playerUrl').textContent;
+    navigator.clipboard.writeText(url).then(() => toast('📋 URL copiée !'));
+  }
+
+  function showAlert(type, msg) {
+    const el = document.getElementById('alertBox');
+    el.className = 'alert show ' + type;
+    el.textContent = msg;
+  }
+
+  // ── TV PLAYER ──
+  function loadTVPlayer() {
+    const player = document.getElementById('mainPlayer');
+    const msg    = document.getElementById('noVideoMsg');
+    const sub    = document.getElementById('noVideoSub');
+
+    // Try to load from server
+    player.src = '/video';
+    player.style.display = 'block';
+    msg.style.display = 'none';
+
+    player.onerror = () => {
+      player.style.display = 'none';
+      msg.style.display = 'block';
+      sub.textContent = 'Aucune vidéo sur le serveur — uploadez-en une depuis Admin.';
+    };
+
+    player.oncanplay = () => {
+      msg.style.display = 'none';
+      player.style.display = 'block';
+      player.play().catch(() => {
+        // Autoplay blocked — show tap to play
+        msg.style.display = 'block';
+        msg.querySelector('p').textContent = '▶ Appuyez pour lire';
+        msg.style.cursor = 'pointer';
+        msg.onclick = () => { player.play(); msg.style.display = 'none'; };
+      });
+    };
+  }
+
+  // ── TOAST ──
+  function toast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 3000);
+  }
+
+  // Auto-detect TV mode from URL
+  if (window.location.pathname === '/tv') {
+    document.querySelectorAll('header').forEach(h => h.style.display = 'none');
+    document.querySelectorAll('main').forEach(m => { m.style.padding = '0'; m.style.maxWidth = '100%'; });
+    showPage('player');
+    document.body.style.overflow = 'hidden';
+  }
+</script>
+</body>
+</html>

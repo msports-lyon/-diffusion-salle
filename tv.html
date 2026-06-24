@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TV</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      width: 100%; height: 100%;
+      background: #000;
+      overflow: hidden;
+    }
+
+    /* Couche de clic — couvre tout l'écran */
+    #tap-layer {
+      position: fixed;
+      inset: 0;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, 0.85);
+      cursor: pointer;
+      transition: opacity .5s;
+    }
+    #tap-layer.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    #tap-layer .play-icon {
+      font-size: 72px;
+      margin-bottom: 20px;
+      animation: bounce 1.5s infinite;
+    }
+    @keyframes bounce {
+      0%, 100% { transform: scale(1); }
+      50%       { transform: scale(1.12); }
+    }
+
+    #tap-layer p {
+      font-family: Arial, sans-serif;
+      font-size: 22px;
+      color: #fff;
+      letter-spacing: .05em;
+    }
+    #tap-layer small {
+      font-family: Arial, sans-serif;
+      font-size: 14px;
+      color: #888;
+      margin-top: 10px;
+    }
+
+    /* Vidéo — couvre tout */
+    video {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      background: #000;
+    }
+
+    /* Message d'erreur */
+    #error-msg {
+      position: fixed;
+      inset: 0;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: #000;
+      color: #666;
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 40px;
+    }
+    #error-msg.show { display: flex; }
+    #error-msg .icon { font-size: 56px; margin-bottom: 20px; }
+    #error-msg p { font-size: 16px; margin-bottom: 8px; }
+    #error-msg small { font-size: 13px; color: #444; }
+    #error-msg .retry {
+      margin-top: 24px;
+      background: #222;
+      border: 1px solid #444;
+      color: #aaa;
+      padding: 10px 24px;
+      border-radius: 8px;
+      font-size: 14px;
+      cursor: pointer;
+      font-family: Arial, sans-serif;
+    }
+
+    /* Indicateur de chargement */
+    #loading {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #000;
+    }
+    #loading .spinner {
+      width: 48px; height: 48px;
+      border: 3px solid #222;
+      border-top-color: #00e5b0;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #loading.hidden { display: none; }
+  </style>
+</head>
+<body>
+
+  <!-- Chargement -->
+  <div id="loading"><div class="spinner"></div></div>
+
+  <!-- Vidéo -->
+  <video id="vid" loop playsinline preload="auto"></video>
+
+  <!-- Écran de démarrage (clic télécommande) -->
+  <div id="tap-layer" style="display:none;">
+    <div class="play-icon">▶</div>
+    <p>Appuyez sur OK pour lancer</p>
+    <small>La vidéo passera en boucle automatiquement</small>
+  </div>
+
+  <!-- Erreur -->
+  <div id="error-msg">
+    <div class="icon">📡</div>
+    <p>Impossible de charger la vidéo</p>
+    <small id="error-sub">Vérifiez que le serveur est lancé sur le PC</small>
+    <button class="retry" onclick="location.reload()">↻ Réessayer</button>
+  </div>
+
+<script>
+  var vid      = document.getElementById('vid');
+  var tapLayer = document.getElementById('tap-layer');
+  var loading  = document.getElementById('loading');
+  var errMsg   = document.getElementById('error-msg');
+  var errSub   = document.getElementById('error-sub');
+
+  // Construire l'URL de la vidéo depuis le même serveur
+  var serverBase = window.location.protocol + '//' + window.location.host;
+  var videoSrc   = serverBase + '/video';
+
+  // ── CHARGEMENT ──
+  vid.src = videoSrc;
+  vid.load();
+
+  vid.addEventListener('error', function () {
+    loading.classList.add('hidden');
+    tapLayer.style.display = 'none';
+    errMsg.classList.add('show');
+    errSub.textContent = 'URL serveur : ' + videoSrc;
+  });
+
+  vid.addEventListener('canplay', function () {
+    loading.classList.add('hidden');
+    tryAutoplay();
+  });
+
+  // ── AUTOPLAY : on essaie d'abord muet, puis on affiche le bouton si bloqué ──
+  function tryAutoplay() {
+    vid.muted = true;
+    var p = vid.play();
+
+    if (p !== undefined) {
+      p.then(function () {
+        // Autoplay OK — masquer tout
+        tapLayer.style.display = 'none';
+      }).catch(function () {
+        // Autoplay bloqué — afficher le bouton
+        tapLayer.style.display = 'flex';
+      });
+    } else {
+      // Ancien navigateur — supposer que ça joue
+      tapLayer.style.display = 'none';
+    }
+  }
+
+  // ── CLIC / TOUCHE TÉLÉCOMMANDE pour démarrer ──
+  function startPlay() {
+    vid.muted = true;
+    vid.play().then(function () {
+      tapLayer.classList.add('hidden');
+      // Essai de passage plein écran
+      requestFS();
+    }).catch(function () {
+      // Ne rien faire, la vidéo est déjà affichée
+    });
+  }
+
+  tapLayer.addEventListener('click', startPlay);
+
+  document.addEventListener('keydown', function (e) {
+    // OK (13), Entrée, Espace, touches télécommande courantes
+    if ([13, 32, 179, 415].indexOf(e.keyCode) !== -1) {
+      if (tapLayer.style.display !== 'none' && !tapLayer.classList.contains('hidden')) {
+        startPlay();
+      }
+    }
+  });
+
+  // ── PLEIN ÉCRAN (best-effort sur Smart TV) ──
+  function requestFS() {
+    var el = document.documentElement;
+    var fn = el.requestFullscreen
+           || el.webkitRequestFullscreen
+           || el.mozRequestFullScreen
+           || el.msRequestFullscreen;
+    if (fn) {
+      try { fn.call(el); } catch (e) { /* ignoré si bloqué */ }
+    }
+  }
+
+  // Tenter le plein écran dès le chargement aussi
+  vid.addEventListener('canplay', function () {
+    requestFS();
+  }, { once: true });
+
+  // ── RETRY automatique si la vidéo s'arrête ──
+  vid.addEventListener('ended', function () {
+    // Ne devrait pas arriver (loop=true) mais sécurité
+    vid.currentTime = 0;
+    vid.play();
+  });
+
+  // ── RELOAD automatique si le serveur est indisponible ──
+  vid.addEventListener('stalled', function () {
+    setTimeout(function () {
+      if (vid.paused) {
+        vid.load();
+        vid.play().catch(function () {});
+      }
+    }, 5000);
+  });
+</script>
+</body>
+</html>
